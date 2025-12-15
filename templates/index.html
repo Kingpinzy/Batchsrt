@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>批量视频字幕合成工具</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #000000;
+            --primary-hover: #333333;
+            --bg-body: #f5f5f5;
+            --bg-card: #ffffff;
+            --text-main: #000000;
+            --text-secondary: #666666;
+            --border: #e0e0e0;
+            --success: #000000;
+            --error: #000000;
+            --warning: #000000;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-body);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1600px;
+            background: var(--bg-card);
+            border-radius: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 80px);
+        }
+
+        .header {
+            background: white;
+            padding: 30px 40px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* 左侧配置面板 */
+        .left-panel {
+            flex: 1;
+            min-width: 500px;
+            max-width: 50%;
+            padding: 30px;
+            overflow-y: auto;
+            border-right: 1px solid var(--border);
+            background: #fafafa;
+        }
+
+        /* 右侧日志面板 */
+        .right-panel {
+            flex: 1;
+            min-width: 500px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: white;
+        }
+
+        .form-section {
+            display: grid;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: var(--text-main);
+            font-size: 14px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 12px;
+            position: relative;
+        }
+
+        .form-group input[type="text"] {
+            flex: 1;
+            padding: 14px 16px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 14px;
+            color: var(--text-main);
+            background: #f8fafc;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .form-group input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group input[type="text"].valid {
+            border-color: #000000;
+            background-color: #f5f5f5;
+        }
+
+        .form-group input[type="text"].invalid {
+            border-color: #666666;
+            background-color: #f5f5f5;
+        }
+
+        .btn {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 0.3px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            width: 100%;
+            font-size: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            min-width: 80px;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #f5f5f5;
+            border-color: #999999;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        .btn-danger {
+            background: #333333;
+            color: white;
+            width: 100%;
+            font-size: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #000000;
+            transform: translateY(-1px);
+        }
+
+        .validation-message {
+            font-size: 12px;
+            margin-top: 4px;
+            min-height: 18px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .validation-message.success { color: #000000; }
+        .validation-message.error { color: #000000; }
+        .validation-message.warning { color: #666666; }
+
+        .language-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .tag {
+            padding: 4px 10px;
+            background: #e8e8e8;
+            color: var(--text-main);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* GPU Section Styling */
+        .gpu-section {
+            background: #f8f8f8;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            transition: all 0.2s ease;
+        }
+
+        .gpu-section:hover {
+            border-color: #cbd5e1;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            border-radius: 6px;
+            border: 2px solid var(--border);
+            appearance: none;
+            background: white;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .checkbox-wrapper input[type="checkbox"]:checked {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .checkbox-wrapper input[type="checkbox"]:checked::after {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 2px;
+            width: 4px;
+            height: 9px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        .gpu-badge {
+            padding: 4px 10px;
+            background: rgba(0, 179, 77, 1);
+            color: white;
+            border-radius: 4px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 10px;
+        }
+
+        .gpu-options {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(0,0,0,0.05);
+            animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .gpu-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--text-main);
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 16px;
+        }
+
+        .gpu-select:hover {
+            border-color: #999999;
+        }
+
+        .gpu-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .gpu-hint {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .alert {
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+
+        .alert-info {
+            background: #f5f5f5;
+            color: #000000;
+            border: 1px solid #e0e0e0;
+        }
+
+        .alert-info ul {
+            padding-left: 18px;
+            margin-top: 6px;
+            color: #333333;
+        }
+
+        .alert-info li {
+            margin-bottom: 2px;
+        }
+
+        /* Log Section */
+        .log-section {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-shrink: 0;
+        }
+
+        .log-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 99px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-idle { background: #f5f5f5; color: var(--text-secondary); }
+        .status-processing {
+            background: #e8e8e8;
+            color: #000000;
+            animation: pulse 2s infinite;
+        }
+        .status-completed { background: #e8e8e8; color: #000000; }
+        .status-error { background: #e8e8e8; color: #000000; }
+
+        .progress-bar-container {
+            height: 8px;
+            background: #e8e8e8;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 4px;
+            transition: width 0.4s ease;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        .log-box {
+            background: #000000;
+            color: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            flex: 1;
+            overflow-y: auto;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.8;
+            border: 1px solid #333333;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .log-line {
+            margin-bottom: 4px;
+            border-left: 3px solid transparent;
+            padding-left: 12px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            border-top: 1px solid var(--border);
+            margin-top: 20px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb {
+            background: #999999;
+            border-radius: 4px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+        ::-webkit-scrollbar-thumb:hover { background-color: #666666; }
+        .log-box::-webkit-scrollbar-thumb { background-color: #666666; }
+        .log-box::-webkit-scrollbar-thumb:hover { background-color: #999999; }
+
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .container {
+                max-width: 100%;
+                height: auto;
+                min-height: calc(100vh - 80px);
+            }
+
+            .content {
+                flex-direction: column;
+            }
+
+            .left-panel {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .right-panel {
+                width: 100%;
+                min-height: 500px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 10px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .left-panel, .right-panel {
+                padding: 20px;
+            }
+
+            .input-group {
+                flex-direction: column;
+            }
+
+            .btn-secondary {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>批量视频字幕合成工具</h1>
+            <p>Batch Video Subtitle Merger Tool</p>
+        </div>
+
+        <div class="content">
+            <!-- 左侧：配置面板 -->
+            <div class="left-panel">
+                <h3 class="section-title">📁 配置参数</h3>
+
+                <!-- 文件夹选择表单 -->
+                <div class="form-section">
+                <div class="form-group">
+                    <label>原视频文件夹</label>
+                    <div class="input-group">
+                        <input type="text" id="videoFolder" placeholder="/path/to/videos" oninput="handlePathInput('video')">
+                        <button id="validateVideoBtn" class="btn btn-secondary" onclick="validateFolder('video')" disabled>验证</button>
+                    </div>
+                    <div id="videoFolderMsg" class="validation-message"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>字幕文件夹</label>
+                    <div class="input-group">
+                        <input type="text" id="subtitleFolder" placeholder="/path/to/subtitles" oninput="handlePathInput('subtitle')">
+                        <button id="validateSubtitleBtn" class="btn btn-secondary" onclick="validateFolder('subtitle')" disabled>验证</button>
+                    </div>
+                    <div id="subtitleFolderMsg" class="validation-message"></div>
+                    <div id="languageContainer" class="language-tags"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>输出文件夹</label>
+                    <div class="input-group">
+                        <input type="text" id="outputFolder" placeholder="/path/to/output" oninput="handlePathInput('output')">
+                        <button id="validateOutputBtn" class="btn btn-secondary" onclick="validateFolder('output')" disabled>验证</button>
+                    </div>
+                    <div id="outputFolderMsg" class="validation-message"></div>
+                </div>
+            </div>
+
+            <!-- GPU 加速模块 -->
+            <div class="gpu-section">
+                <label class="checkbox-wrapper">
+                    <input type="checkbox" id="useGpu" onchange="toggleGpuOptions()">
+                    <span style="font-weight: 600; font-size: 15px; color: var(--text-main);">启用 GPU 硬件加速</span>
+                    <span id="gpuBadge" class="gpu-badge" style="display: none;">推荐</span>
+                </label>
+                
+                <div id="gpuOptions" class="gpu-options" style="display: none;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">选择加速设备</label>
+                    <select id="gpuType" class="gpu-select">
+                        <option value="auto">✨ 自动检测最佳设备</option>
+                    </select>
+                    <div class="gpu-hint">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                        </svg>
+                        GPU 加速可显著提升处理速度（2-5倍），需配合兼容驱动
+                    </div>
+                </div>
+            </div>
+
+            <!-- 使用说明 -->
+            <div class="alert alert-info">
+                <strong>💡 使用指南</strong>
+                <ul>
+                    <li>分别选择视频、字幕和输出文件夹，并点击"验证"</li>
+                    <li>字幕文件命名需格式统一：视频名_语种.srt（例：001_AR.srt）</li>
+                    <li>所有路径验证通过后，底部按钮将亮起</li>
+                </ul>
+            </div>
+
+                <!-- 操作按钮 -->
+                <div style="margin-top: 24px;">
+                    <button id="startBtn" class="btn btn-primary" onclick="startMerge()" disabled>
+                        开始批量合成
+                    </button>
+                    <button id="stopBtn" class="btn btn-danger" onclick="stopMerge()" style="display:none;">
+                        终止任务
+                    </button>
+                </div>
+            </div>
+
+            <!-- 右侧：进度监控 -->
+            <div class="right-panel">
+                <div class="log-header">
+                    <h3>📊 实时进度</h3>
+                    <div id="statusBadge" class="status-badge status-idle">待机</div>
+                </div>
+
+                <div id="currentTask" style="margin-bottom: 12px; font-size: 14px; color: var(--text-secondary); display: none;">
+                    当前任务：<span id="currentTaskText" style="color: var(--text-main); font-weight: 600;">...</span>
+                </div>
+
+                <div class="progress-bar-container">
+                    <div id="progressBar" class="progress-bar" style="width: 0%;"></div>
+                </div>
+
+                <div class="progress-info">
+                    <span id="progressBarText">0%</span>
+                    <span id="progressText">0 / 0</span>
+                </div>
+
+                <div id="logBox" class="log-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let statusCheckInterval = null;
+        let validationState = {
+            video: false,
+            subtitle: false,
+            output: false
+        };
+        let gpuInfo = null;
+
+        // 页面加载
+        window.addEventListener('load', async () => {
+            addLog('✨ 系统就绪，等待任务配置...');
+            await detectGPU();
+        });
+
+        // 页面关闭清理
+        window.addEventListener('beforeunload', () => {
+            if (statusCheckInterval) clearInterval(statusCheckInterval);
+        });
+
+        // GPU 检测
+        async function detectGPU() {
+            try {
+                const response = await fetch('/api/detect_gpu');
+                gpuInfo = await response.json();
+
+                const gpuTypeSelect = document.getElementById('gpuType');
+                gpuTypeSelect.innerHTML = '';
+
+                gpuInfo.gpu_types.forEach(gpu => {
+                    const option = document.createElement('option');
+                    option.value = gpu.value;
+                    option.textContent = `${gpu.icon} ${gpu.label}`;
+                    gpuTypeSelect.appendChild(option);
+                });
+
+                if (gpuInfo.has_gpu) {
+                    document.getElementById('gpuBadge').style.display = 'inline-flex';
+                    addLog(`✅ 检测到 GPU 加速设备: ${gpuInfo.recommended.toUpperCase()}`);
+                } else {
+                    addLog('ℹ️ 未检测到独立显卡，将使用 CPU 进行处理');
+                }
+            } catch (error) {
+                console.error('GPU检测失败:', error);
+                addLog('⚠️ GPU 环境检测失败，默认回退至 CPU 模式');
+            }
+        }
+
+        function toggleGpuOptions() {
+            const useGpu = document.getElementById('useGpu').checked;
+            const gpuOptions = document.getElementById('gpuOptions');
+
+            if (useGpu) {
+                gpuOptions.style.display = 'block';
+                addLog('⚡ 已启用 GPU 硬件加速模式');
+            } else {
+                gpuOptions.style.display = 'none';
+                addLog('💻 已切换至标准 CPU 处理模式');
+            }
+        }
+
+        // 路径验证逻辑
+        function validatePathFormat(path) {
+            const trimmed = path.trim();
+            if (!trimmed) return { valid: false, message: '路径不能为空' };
+            if (trimmed !== path) return { valid: false, message: '路径前后不能包含空格' };
+            if (trimmed.includes('"') || trimmed.includes("'")) return { valid: false, message: '路径不能包含引号' };
+            if (/\s{2,}/.test(trimmed)) return { valid: false, message: '路径格式错误：连续空格' };
+            
+            // 简单放宽验证，兼容更多路径格式，主要依赖后端检查
+            if (trimmed.length > 0) return { valid: true, message: '' };
+            
+            return { valid: false, message: '无效的路径格式' };
+        }
+
+        function handlePathInput(type) {
+            const input = document.getElementById(`${type}Folder`);
+            const button = document.getElementById(`validate${type.charAt(0).toUpperCase() + type.slice(1)}Btn`);
+            const message = document.getElementById(`${type}FolderMsg`);
+            const path = input.value;
+
+            input.classList.remove('valid', 'invalid');
+            validationState[type] = false;
+
+            if (!path) {
+                button.disabled = true;
+                message.textContent = '';
+                message.className = 'validation-message';
+                updateStartButton();
+                return;
+            }
+
+            const formatCheck = validatePathFormat(path);
+            if (!formatCheck.valid) {
+                input.classList.add('invalid');
+                message.innerHTML = `<span style="color:var(--warning)">⚠</span> ${formatCheck.message}`;
+                message.className = 'validation-message warning';
+            } else {
+                message.textContent = '';
+                message.className = 'validation-message';
+            }
+            // 始终允许验证，因为主要是为了测试连通性
+            button.disabled = false;
+            updateStartButton();
+        }
+
+        async function validateFolder(type) {
+            const input = document.getElementById(`${type}Folder`);
+            const message = document.getElementById(`${type}FolderMsg`);
+            const path = input.value.trim();
+
+            if (!path) return;
+
+            message.innerHTML = '<span class="loading-dots">正在验证</span>';
+            message.className = 'validation-message';
+
+            try {
+                const response = await fetch('/api/validate_folder', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ folder_path: path, folder_type: type })
+                });
+
+                const data = await response.json();
+
+                if (data.valid) {
+                    input.classList.remove('invalid');
+                    input.classList.add('valid');
+                    message.innerHTML = `<span>✓</span> ${data.message}`;
+                    message.className = 'validation-message success';
+                    validationState[type] = true;
+                    addLog(`📁 ${type === 'video' ? '视频' : type === 'subtitle' ? '字幕' : '输出'}路径已确认`);
+
+                    if (type === 'subtitle' && data.languages) {
+                        const container = document.getElementById('languageContainer');
+                        container.innerHTML = '';
+                        data.languages.forEach(lang => {
+                            const tag = document.createElement('span');
+                            tag.className = 'tag';
+                            tag.textContent = lang;
+                            container.appendChild(tag);
+                        });
+                    }
+                } else {
+                    input.classList.remove('valid');
+                    input.classList.add('invalid');
+                    message.innerHTML = `<span>✗</span> ${data.message}`;
+                    message.className = 'validation-message error';
+                    validationState[type] = false;
+                }
+            } catch (error) {
+                input.classList.add('invalid');
+                message.innerHTML = `<span>✗</span> 验证请求失败`;
+                message.className = 'validation-message error';
+                validationState[type] = false;
+            }
+
+            updateStartButton();
+        }
+
+        function updateStartButton() {
+            const startBtn = document.getElementById('startBtn');
+            const allValid = validationState.video && validationState.subtitle && validationState.output;
+            startBtn.disabled = !allValid;
+        }
+
+        async function startMerge() {
+            if (!validationState.video || !validationState.subtitle || !validationState.output) {
+                alert('请先完成所有路径验证');
+                return;
+            }
+
+            const videoFolder = document.getElementById('videoFolder').value.trim();
+            const subtitleFolder = document.getElementById('subtitleFolder').value.trim();
+            const outputFolder = document.getElementById('outputFolder').value.trim();
+            
+            // 获取GPU设置
+            const useGpu = document.getElementById('useGpu').checked;
+            const gpuType = document.getElementById('gpuType').value;
+
+            if (!confirm('确定要开始批量合成任务吗？')) return;
+
+            document.getElementById('logBox').innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/start_merge', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        video_folder: videoFolder,
+                        subtitle_folder: subtitleFolder,
+                        output_folder: outputFolder,
+                        use_gpu: useGpu,
+                        gpu_type: gpuType
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    addLog('🚀 任务队列已启动...');
+                    document.getElementById('startBtn').style.display = 'none';
+                    document.getElementById('stopBtn').style.display = 'block';
+                    updateStatus('processing');
+                    
+                    if (statusCheckInterval) clearInterval(statusCheckInterval);
+                    statusCheckInterval = setInterval(checkStatus, 1000);
+                } else {
+                    alert('启动失败: ' + data.error);
+                }
+            } catch (error) {
+                alert('系统错误: ' + error.message);
+            }
+        }
+
+        async function stopMerge() {
+            if (!confirm('确定要终止当前任务吗？')) return;
+
+            try {
+                const response = await fetch('/api/stop', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    addLog('🛑 正在请求终止任务...');
+                    document.getElementById('stopBtn').disabled = true;
+                }
+            } catch (error) {
+                alert('操作失败: ' + error.message);
+            }
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+
+                const progress = data.total > 0 ? (data.progress / data.total * 100).toFixed(1) : 0;
+                document.getElementById('progressBar').style.width = progress + '%';
+                document.getElementById('progressBarText').textContent = `${Math.round(progress)}%`;
+                document.getElementById('progressText').textContent = `${data.progress} / ${data.total}`;
+
+                const currentTaskEl = document.getElementById('currentTask');
+                if (data.current_task) {
+                    currentTaskEl.style.display = 'block';
+                    document.getElementById('currentTaskText').textContent = data.current_task;
+                } else {
+                    currentTaskEl.style.display = 'none';
+                }
+
+                if (data.logs && data.logs.length > 0) {
+                    const logBox = document.getElementById('logBox');
+                    const currentLogCount = logBox.children.length;
+                    if (data.logs.length > currentLogCount) {
+                        for (let i = currentLogCount; i < data.logs.length; i++) {
+                            addLog(data.logs[i], false);
+                        }
+                        logBox.scrollTop = logBox.scrollHeight;
+                    }
+                }
+
+                if (data.completed) {
+                    finishTask('completed', '🎉 所有任务已处理完成！');
+                } else if (data.error) {
+                    const isAborted = data.error.includes('终止');
+                    finishTask('error', isAborted ? '⚠️ 任务已终止' : `❌ 错误: ${data.error}`);
+                } else if (data.is_processing) {
+                    updateStatus('processing');
+                }
+            } catch (error) {
+                console.error('状态同步失败', error);
+            }
+        }
+
+        function finishTask(status, message) {
+            clearInterval(statusCheckInterval);
+            statusCheckInterval = null;
+            document.getElementById('startBtn').style.display = 'block';
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('stopBtn').disabled = false;
+            updateStatus(status);
+            if(message) alert(message);
+        }
+
+        function addLog(message, scroll = true) {
+            const logBox = document.getElementById('logBox');
+            const logLine = document.createElement('div');
+            logLine.className = 'log-line';
+
+            if (message.includes('✓') || message.includes('完成') || message.includes('成功')) {
+                logLine.style.color = '#4ade80';
+            } else if (message.includes('✗') || message.includes('失败') || message.includes('错误')) {
+                logLine.style.color = '#f87171';
+            } else if (message.includes('⚠') || message.includes('跳过')) {
+                logLine.style.color = '#fbbf24';
+            } else if (message.includes('🚀') || message.includes('===')) {
+                logLine.style.color = '#60a5fa';
+                logLine.style.fontWeight = 'bold';
+            }
+
+            logLine.textContent = message;
+            logBox.appendChild(logLine);
+
+            if (scroll) logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function updateStatus(status) {
+            const badge = document.getElementById('statusBadge');
+            badge.className = 'status-badge';
+            
+            switch(status) {
+                case 'processing':
+                    badge.classList.add('status-processing');
+                    badge.innerHTML = '<span class="loading-dots">处理中</span>';
+                    break;
+                case 'completed':
+                    badge.classList.add('status-completed');
+                    badge.textContent = '完成';
+                    break;
+                case 'error':
+                    badge.classList.add('status-error');
+                    badge.textContent = '异常';
+                    break;
+                default:
+                    badge.classList.add('status-idle');
+                    badge.textContent = '待机';
+            }
+        }
+    </script>
+</body>
+</html>
