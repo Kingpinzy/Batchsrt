@@ -68,7 +68,7 @@ class SubtitleMerger:
 
         return sorted(video_files)
 
-    def merge_subtitle(self, video_path, subtitle_path, output_path, use_gpu=False, gpu_type='auto'):
+    def merge_subtitle(self, video_path, subtitle_path, output_path, use_gpu=False, gpu_type='auto', subtitle_style=None):
         """使用ffmpeg合并视频和字幕
 
         Args:
@@ -77,6 +77,13 @@ class SubtitleMerger:
             output_path: 输出文件路径
             use_gpu: 是否使用GPU加速
             gpu_type: GPU类型 ('auto', 'nvidia', 'amd', 'intel', 'apple')
+            subtitle_style: 字幕样式配置字典 (可选)
+                - font_size: 字体大小 (默认: 原样式)
+                - margin_v: 垂直边距 (默认: 原样式)
+                - alignment: 对齐方式 1-9 (默认: 2 底部居中)
+                - font_name: 字体名称 (可选)
+                - outline: 轮廓粗细 (可选)
+                - shadow: 阴影深度 (可选)
         """
         global current_process
 
@@ -107,7 +114,29 @@ class SubtitleMerger:
 
             # 字幕滤镜 - 需要处理Windows路径：替换反斜杠为正斜杠，并转义冒号
             filter_subtitle_path = subtitle_path.replace('\\', '/').replace(':', '\\:')
-            cmd.extend(['-vf', f"subtitles='{filter_subtitle_path}'"])
+
+            # 构建字幕样式参数
+            subtitle_filter = f"subtitles='{filter_subtitle_path}'"
+            if subtitle_style:
+                style_params = []
+                if subtitle_style.get('font_size'):
+                    style_params.append(f"FontSize={subtitle_style['font_size']}")
+                if subtitle_style.get('margin_v'):
+                    style_params.append(f"MarginV={subtitle_style['margin_v']}")
+                if subtitle_style.get('alignment'):
+                    style_params.append(f"Alignment={subtitle_style['alignment']}")
+                if subtitle_style.get('font_name'):
+                    style_params.append(f"FontName={subtitle_style['font_name']}")
+                if subtitle_style.get('outline'):
+                    style_params.append(f"Outline={subtitle_style['outline']}")
+                if subtitle_style.get('shadow'):
+                    style_params.append(f"Shadow={subtitle_style['shadow']}")
+
+                if style_params:
+                    force_style = ','.join(style_params)
+                    subtitle_filter = f"subtitles='{filter_subtitle_path}':force_style='{force_style}'"
+
+            cmd.extend(['-vf', subtitle_filter])
 
             # 视频编码器设置
             video_codec = 'libx264'
@@ -174,7 +203,7 @@ class SubtitleMerger:
         except:
             return False
 
-    def batch_merge(self, video_folder, subtitle_folder, output_folder, use_gpu=False, gpu_type='auto'):
+    def batch_merge(self, video_folder, subtitle_folder, output_folder, use_gpu=False, gpu_type='auto', subtitle_style=None):
         """批量合成视频字幕
 
         Args:
@@ -183,6 +212,7 @@ class SubtitleMerger:
             output_folder: 输出文件夹
             use_gpu: 是否使用GPU加速
             gpu_type: GPU类型
+            subtitle_style: 字幕样式配置
         """
         global processing_status
 
@@ -193,11 +223,23 @@ class SubtitleMerger:
         processing_status['progress'] = 0
         processing_status['stop_requested'] = False
 
-        # 记录加速模式
+        # 记录加速模式和字幕样式
         if use_gpu:
             self.log(f"🚀 已启用GPU加速 (类型: {gpu_type})")
         else:
             self.log("💻 使用CPU处理模式")
+
+        if subtitle_style:
+            style_info = []
+            if subtitle_style.get('font_size'):
+                style_info.append(f"字体大小={subtitle_style['font_size']}")
+            if subtitle_style.get('margin_v'):
+                style_info.append(f"底部边距={subtitle_style['margin_v']}")
+            if subtitle_style.get('alignment'):
+                alignment_map = {1: '左下', 2: '底部居中', 3: '右下', 4: '左中', 5: '居中', 6: '右中', 7: '左上', 8: '顶部居中', 9: '右上'}
+                style_info.append(f"位置={alignment_map.get(subtitle_style['alignment'], subtitle_style['alignment'])}")
+            if style_info:
+                self.log(f"🎨 字幕样式: {', '.join(style_info)}")
 
         try:
             # 获取所有视频文件
@@ -268,7 +310,7 @@ class SubtitleMerger:
                     self.log(f"正在处理: {output_file}")
 
                     # 合成视频和字幕
-                    success, error_msg = self.merge_subtitle(video_path, subtitle_path, output_path, use_gpu, gpu_type)
+                    success, error_msg = self.merge_subtitle(video_path, subtitle_path, output_path, use_gpu, gpu_type, subtitle_style)
 
                     if success:
                         self.log(f"✓ 完成: {output_file}")
@@ -403,6 +445,24 @@ def start_merge():
     use_gpu = data.get('use_gpu', False)
     gpu_type = data.get('gpu_type', 'auto')
 
+    # 获取字幕样式配置
+    subtitle_style = None
+    if data.get('subtitle_style'):
+        style_data = data['subtitle_style']
+        subtitle_style = {}
+        if style_data.get('font_size'):
+            subtitle_style['font_size'] = int(style_data['font_size'])
+        if style_data.get('margin_v'):
+            subtitle_style['margin_v'] = int(style_data['margin_v'])
+        if style_data.get('alignment'):
+            subtitle_style['alignment'] = int(style_data['alignment'])
+        if style_data.get('font_name'):
+            subtitle_style['font_name'] = style_data['font_name']
+        if style_data.get('outline'):
+            subtitle_style['outline'] = int(style_data['outline'])
+        if style_data.get('shadow'):
+            subtitle_style['shadow'] = int(style_data['shadow'])
+
     # 验证输入
     if not all([video_folder, subtitle_folder, output_folder]):
         return jsonify({'success': False, 'error': '请填写所有文件夹路径'})
@@ -422,7 +482,7 @@ def start_merge():
     # 在新线程中执行处理
     thread = threading.Thread(
         target=merger.batch_merge,
-        args=(video_folder, subtitle_folder, output_folder, use_gpu, gpu_type)
+        args=(video_folder, subtitle_folder, output_folder, use_gpu, gpu_type, subtitle_style)
     )
     thread.daemon = True
     thread.start()

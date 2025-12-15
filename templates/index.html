@@ -349,6 +349,60 @@
             color: var(--text-secondary);
         }
 
+        /* 滑块样式 */
+        .style-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e0e0e0;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .style-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .style-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .style-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+
+        .style-slider::-moz-range-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.1);
+        }
+
+        details summary {
+            list-style: none;
+        }
+
+        details summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details[open] summary {
+            margin-bottom: 16px;
+        }
+
         .alert {
             padding: 14px;
             border-radius: 10px;
@@ -596,7 +650,7 @@
                     <span style="font-weight: 600; font-size: 15px; color: var(--text-main);">启用 GPU 硬件加速</span>
                     <span id="gpuBadge" class="gpu-badge" style="display: none;">推荐</span>
                 </label>
-                
+
                 <div id="gpuOptions" class="gpu-options" style="display: none;">
                     <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">选择加速设备</label>
                     <select id="gpuType" class="gpu-select">
@@ -607,6 +661,107 @@
                             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
                         </svg>
                         GPU 加速可显著提升处理速度（2-5倍），需配合兼容驱动
+                    </div>
+                </div>
+            </div>
+
+            <!-- 字幕样式配置模块 -->
+            <div class="gpu-section">
+                <label class="checkbox-wrapper">
+                    <input type="checkbox" id="useCustomStyle" onchange="toggleStyleOptions()">
+                    <span style="font-weight: 600; font-size: 15px; color: var(--text-main);">自定义字幕样式</span>
+                </label>
+
+                <div id="styleOptions" class="gpu-options" style="display: none;">
+                    <!-- 视频比例选择 -->
+                    <div style="margin-bottom: 20px; padding: 12px; background: #f0f0f0; border-radius: 8px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-main);">
+                            📐 视频画面比例
+                        </label>
+                        <select id="videoRatio" class="gpu-select" onchange="handleRatioChange()">
+                            <option value="16:9">16:9 横屏（常规视频，如 1920×1080）</option>
+                            <option value="9:16">9:16 竖屏（手机视频，如 1080×1920）</option>
+                            <option value="1:1">1:1 方形（社交媒体，如 1080×1080）</option>
+                            <option value="4:3">4:3 标准（传统视频，如 1440×1080）</option>
+                        </select>
+                        <div style="margin-top: 8px; font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                            ⚠️ 请根据您的视频比例选择，预设位置会自动调整
+                        </div>
+                    </div>
+
+                    <!-- 字体大小 -->
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">
+                            字体大小: <span id="fontSizeValue" style="color: var(--text-main);">24</span>
+                        </label>
+                        <input type="range" id="fontSize" class="style-slider" min="5" max="72" value="24" step="1" oninput="updateSliderValue('fontSize')">
+                    </div>
+
+                    <!-- 底部边距 -->
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">
+                            垂直边距: <span id="marginVValue" style="color: var(--text-main);">50</span> px
+                        </label>
+                        <input type="range" id="marginV" class="style-slider" min="0" max="600" value="50" step="10" oninput="updateSliderValue('marginV')">
+                        <div style="margin-top: 4px; font-size: 11px; color: var(--text-secondary);">
+                            从底部（默认）或顶部（选择顶部对齐时）的距离
+                        </div>
+                    </div>
+
+                    <!-- 对齐方式 -->
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">字幕位置</label>
+                        <select id="alignment" class="gpu-select" onchange="handleAlignmentChange()">
+                            <option value="2">底部居中（默认）</option>
+                            <option value="1">左下</option>
+                            <option value="3">右下</option>
+                            <option value="5">屏幕中央</option>
+                            <option value="8">顶部居中</option>
+                            <option value="7">左上</option>
+                            <option value="9">右上</option>
+                        </select>
+                    </div>
+
+                    <!-- 高级选项（可折叠） -->
+                    <details style="margin-top: 16px;">
+                        <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">高级选项</summary>
+
+                        <!-- 字体名称 -->
+                        <div style="margin-bottom: 16px; margin-top: 12px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">字体名称（可选）</label>
+                            <input type="text" id="fontName" class="gpu-select" placeholder="例如: Arial, 微软雅黑" style="padding: 10px 16px;">
+                        </div>
+
+                        <!-- 轮廓粗细 -->
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">
+                                轮廓粗细: <span id="outlineValue" style="color: var(--text-main);">0</span>
+                            </label>
+                            <input type="range" id="outline" class="style-slider" min="0" max="5" value="0" step="1" oninput="updateSliderValue('outline')">
+                            <div style="margin-top: 4px; font-size: 11px; color: var(--text-secondary);">
+                                设为 0 = 无黑边，设为 2-3 = 清晰可见（推荐复杂背景使用）
+                            </div>
+                        </div>
+
+                        <!-- 阴影深度 -->
+                        <div style="margin-bottom: 0;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">
+                                阴影深度: <span id="shadowValue" style="color: var(--text-main);">0</span>
+                            </label>
+                            <input type="range" id="shadow" class="style-slider" min="0" max="5" value="0" step="1" oninput="updateSliderValue('shadow')">
+                            <div style="margin-top: 4px; font-size: 11px; color: var(--text-secondary);">
+                                设为 0 = 无阴影，设为 1-2 = 增加立体感
+                            </div>
+                        </div>
+                    </details>
+
+                    <div class="gpu-hint" style="margin-top: 12px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                        字幕样式会应用到所有输出视频，留空选项将使用原字幕文件样式
                     </div>
                 </div>
             </div>
@@ -715,6 +870,55 @@
             } else {
                 gpuOptions.style.display = 'none';
                 addLog('💻 已切换至标准 CPU 处理模式');
+            }
+        }
+
+        function toggleStyleOptions() {
+            const useCustomStyle = document.getElementById('useCustomStyle').checked;
+            const styleOptions = document.getElementById('styleOptions');
+
+            if (useCustomStyle) {
+                styleOptions.style.display = 'block';
+                addLog('🎨 已启用自定义字幕样式');
+            } else {
+                styleOptions.style.display = 'none';
+                addLog('📝 将使用原字幕文件样式');
+            }
+        }
+
+        function updateSliderValue(sliderId) {
+            const slider = document.getElementById(sliderId);
+            const valueDisplay = document.getElementById(sliderId + 'Value');
+            valueDisplay.textContent = slider.value;
+        }
+
+        function handleRatioChange() {
+            const ratio = document.getElementById('videoRatio').value;
+            const ratioNames = {
+                '16:9': '16:9 横屏（1920×1080）',
+                '9:16': '9:16 竖屏（1080×1920）',
+                '1:1': '1:1 方形（1080×1080）',
+                '4:3': '4:3 标准（1440×1080）'
+            };
+            addLog(`📐 视频比例已切换到：${ratioNames[ratio]}`);
+        }
+
+        function handleAlignmentChange() {
+            const alignment = document.getElementById('alignment').value;
+            const alignmentNames = {
+                '1': '左下', '2': '底部居中', '3': '右下',
+                '4': '左中', '5': '屏幕中央', '6': '右中',
+                '7': '左上', '8': '顶部居中', '9': '右上'
+            };
+
+            if (alignment === '5') {
+                // 中央对齐时，提示可以将边距设为0
+                addLog(`📍 位置已切换到：${alignmentNames[alignment]}（建议边距设为0）`);
+            } else if (['7', '8', '9'].includes(alignment)) {
+                // 顶部对齐时，提示边距是从顶部计算
+                addLog(`📍 位置已切换到：${alignmentNames[alignment]}（边距从顶部计算）`);
+            } else {
+                addLog(`📍 位置已切换到：${alignmentNames[alignment]}`);
             }
         }
 
@@ -832,15 +1036,42 @@
             const videoFolder = document.getElementById('videoFolder').value.trim();
             const subtitleFolder = document.getElementById('subtitleFolder').value.trim();
             const outputFolder = document.getElementById('outputFolder').value.trim();
-            
+
             // 获取GPU设置
             const useGpu = document.getElementById('useGpu').checked;
             const gpuType = document.getElementById('gpuType').value;
 
+            // 获取字幕样式配置
+            let subtitleStyle = null;
+            const useCustomStyle = document.getElementById('useCustomStyle').checked;
+            if (useCustomStyle) {
+                subtitleStyle = {
+                    font_size: document.getElementById('fontSize').value,
+                    margin_v: document.getElementById('marginV').value,
+                    alignment: document.getElementById('alignment').value
+                };
+
+                // 可选项：字体名称
+                const fontName = document.getElementById('fontName').value.trim();
+                if (fontName) {
+                    subtitleStyle.font_name = fontName;
+                }
+
+                // 可选项：轮廓和阴影
+                const outline = document.getElementById('outline').value;
+                const shadow = document.getElementById('shadow').value;
+                if (outline && outline !== '0') {
+                    subtitleStyle.outline = outline;
+                }
+                if (shadow && shadow !== '0') {
+                    subtitleStyle.shadow = shadow;
+                }
+            }
+
             if (!confirm('确定要开始批量合成任务吗？')) return;
 
             document.getElementById('logBox').innerHTML = '';
-            
+
             try {
                 const response = await fetch('/api/start_merge', {
                     method: 'POST',
@@ -850,7 +1081,8 @@
                         subtitle_folder: subtitleFolder,
                         output_folder: outputFolder,
                         use_gpu: useGpu,
-                        gpu_type: gpuType
+                        gpu_type: gpuType,
+                        subtitle_style: subtitleStyle
                     })
                 });
 
