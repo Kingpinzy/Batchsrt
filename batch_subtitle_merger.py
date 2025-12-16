@@ -90,7 +90,9 @@ class SubtitleMerger:
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                encoding='utf-8',
+                errors='replace'  # 遇到无法解码的字符时用替换字符代替
             )
 
             if process.returncode == 0:
@@ -415,7 +417,14 @@ class SubtitleMergerGUI:
     def check_ffmpeg(self):
         """检查ffmpeg是否可用"""
         try:
-            subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            subprocess.run(
+                ['ffmpeg', '-version'], 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE, 
+                check=True,
+                encoding='utf-8',
+                errors='replace'
+            )
             return True
         except (subprocess.CalledProcessError, FileNotFoundError):
             return False

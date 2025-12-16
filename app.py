@@ -173,7 +173,9 @@ class SubtitleMerger:
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                encoding='utf-8',
+                errors='replace'  # 遇到无法解码的字符时用替换字符代替
             )
 
             # 等待进程完成
@@ -190,7 +192,13 @@ class SubtitleMerger:
     def _has_nvidia_gpu(self):
         """检测是否有NVIDIA GPU"""
         try:
-            result = subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result = subprocess.run(
+                ['nvidia-smi'], 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE,
+                encoding='utf-8',
+                errors='replace'
+            )
             return result.returncode == 0
         except:
             return False
@@ -475,7 +483,14 @@ def start_merge():
 
     # 检查ffmpeg
     try:
-        subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(
+            ['ffmpeg', '-version'], 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            check=True,
+            encoding='utf-8',
+            errors='replace'
+        )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return jsonify({'success': False, 'error': '未检测到ffmpeg，请先安装'})
 
