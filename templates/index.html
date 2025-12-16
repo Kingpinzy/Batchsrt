@@ -726,10 +726,42 @@
                     <details style="margin-top: 16px;">
                         <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">高级选项</summary>
 
-                        <!-- 字体名称 -->
-                        <div style="margin-bottom: 16px; margin-top: 12px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">字体名称（可选）</label>
-                            <input type="text" id="fontName" class="gpu-select" placeholder="例如: Arial, 微软雅黑" style="padding: 10px 16px;">
+                        <!-- 字体配置模式选择 -->
+                        <div style="margin-bottom: 16px; margin-top: 12px; padding: 12px; background: #f0f0f0; border-radius: 8px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-main);">
+                                🔤 字体配置模式
+                            </label>
+                            <select id="fontMode" class="gpu-select" onchange="handleFontModeChange()">
+                                <option value="auto">自动映射（推荐）- 根据语种自动选择最佳字体</option>
+                                <option value="name">字体名称 - 手动指定系统字体</option>
+                                <option value="file">字体文件 - 使用fonts目录中的字体文件</option>
+                            </select>
+                            <div id="fontModeHint" style="margin-top: 8px; font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                                ✨ 自动模式会为每种语言选择最合适的字体，解决小语种字体丢失问题
+                            </div>
+                        </div>
+
+                        <!-- 字体名称输入（字体名称模式） -->
+                        <div id="fontNameSection" style="margin-bottom: 16px; display: none;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">字体名称</label>
+                            <input type="text" id="fontName" class="gpu-select" placeholder="例如: Arial, Microsoft YaHei, Noto Sans Arabic" style="padding: 10px 16px;">
+                            <div style="margin-top: 4px; font-size: 11px; color: var(--text-secondary);">
+                                输入已安装的系统字体名称，支持多字体回退（用逗号分隔）
+                            </div>
+                        </div>
+
+                        <!-- 字体文件选择（字体文件模式） -->
+                        <div id="fontFileSection" style="margin-bottom: 16px; display: none;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">选择字体文件</label>
+                            <select id="fontFile" class="gpu-select">
+                                <option value="">从fonts目录选择...</option>
+                            </select>
+                            <button class="btn btn-secondary" onclick="refreshFontFiles()" style="margin-top: 8px; width: 100%;">
+                                🔄 刷新字体列表
+                            </button>
+                            <div id="fontFileHint" style="margin-top: 8px; font-size: 11px; color: var(--text-secondary);">
+
+                            </div>
                         </div>
 
                         <!-- 轮廓粗细 -->
@@ -825,6 +857,7 @@
         window.addEventListener('load', async () => {
             addLog('✨ 系统就绪，等待任务配置...');
             await detectGPU();
+            await refreshFontFiles();
         });
 
         // 页面关闭清理
@@ -919,6 +952,61 @@
                 addLog(`📍 位置已切换到：${alignmentNames[alignment]}（边距从顶部计算）`);
             } else {
                 addLog(`📍 位置已切换到：${alignmentNames[alignment]}`);
+            }
+        }
+
+        // 字体配置相关函数
+        function handleFontModeChange() {
+            const mode = document.getElementById('fontMode').value;
+            const fontNameSection = document.getElementById('fontNameSection');
+            const fontFileSection = document.getElementById('fontFileSection');
+            const fontModeHint = document.getElementById('fontModeHint');
+
+            // 隐藏所有section
+            fontNameSection.style.display = 'none';
+            fontFileSection.style.display = 'none';
+
+            // 根据模式显示对应section
+            if (mode === 'name') {
+                fontNameSection.style.display = 'block';
+                fontModeHint.innerHTML = '📝 手动输入系统已安装的字体名称，可指定多个字体作为回退（用逗号分隔）';
+                addLog('🔤 切换到手动字体名称模式');
+            } else if (mode === 'file') {
+                fontFileSection.style.display = 'block';
+                fontModeHint.innerHTML = '📂 使用fonts目录中的字体文件，推荐下载Noto Sans系列字体';
+                addLog('🔤 切换到字体文件模式');
+            } else {
+                fontModeHint.innerHTML = '✨ 自动模式会为每种语言选择最合适的字体，解决小语种字体丢失问题';
+                addLog('🔤 切换到自动字体映射模式（推荐）');
+            }
+        }
+
+        async function refreshFontFiles() {
+            try {
+                const response = await fetch('/api/font_files');
+                const data = await response.json();
+
+                const fontFileSelect = document.getElementById('fontFile');
+                const fontFileHint = document.getElementById('fontFileHint');
+
+                if (data.success && data.fonts && data.fonts.length > 0) {
+                    fontFileSelect.innerHTML = '<option value="">从fonts目录选择...</option>';
+                    data.fonts.forEach(font => {
+                        const option = document.createElement('option');
+                        option.value = font.path;
+                        option.textContent = font.name;
+                        fontFileSelect.appendChild(option);
+                    });
+                    fontFileHint.innerHTML = `✅ 找到 ${data.count} 个字体文件`;
+                    fontFileHint.style.color = '#000000';
+                } else {
+                    fontFileSelect.innerHTML = '<option value="">未找到字体文件</option>';
+                    fontFileHint.innerHTML = '⚠️ fonts目录为空，<a href="https://fonts.google.com/noto" target="_blank" style="color: #000; text-decoration: underline;">点击下载Noto Sans字体</a>';
+                    fontFileHint.style.color = '#666666';
+                }
+            } catch (error) {
+                console.error('加载字体文件失败:', error);
+                addLog('⚠️ 字体文件列表加载失败');
             }
         }
 
@@ -1051,10 +1139,34 @@
                     alignment: document.getElementById('alignment').value
                 };
 
-                // 可选项：字体名称
-                const fontName = document.getElementById('fontName').value.trim();
-                if (fontName) {
-                    subtitleStyle.font_name = fontName;
+                // 字体配置
+                const fontMode = document.getElementById('fontMode').value;
+
+                if (fontMode === 'auto') {
+                    // 自动映射模式
+                    subtitleStyle.auto_font = true;
+                    addLog('🎨 已启用智能字体映射，将为每种语言自动选择最佳字体');
+                } else if (fontMode === 'name') {
+                    // 手动字体名称模式
+                    const fontName = document.getElementById('fontName').value.trim();
+                    if (fontName) {
+                        subtitleStyle.font_name = fontName;
+                        subtitleStyle.auto_font = false;
+                        addLog(`🔤 使用自定义字体: ${fontName}`);
+                    } else {
+                        subtitleStyle.auto_font = true; // 如果没填，回退到自动模式
+                    }
+                } else if (fontMode === 'file') {
+                    // 字体文件模式
+                    const fontFile = document.getElementById('fontFile').value;
+                    if (fontFile) {
+                        subtitleStyle.font_file = fontFile;
+                        subtitleStyle.auto_font = false;
+                        addLog(`📂 使用字体文件: ${fontFile.split(/[/\\]/).pop()}`);
+                    } else {
+                        alert('请选择一个字体文件');
+                        return;
+                    }
                 }
 
                 // 可选项：轮廓和阴影

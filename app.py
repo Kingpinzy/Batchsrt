@@ -12,6 +12,19 @@ from pathlib import Path
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import time
+from font_config import (
+    get_font_for_language,
+    build_font_family_string,
+    get_all_font_files,
+    is_font_file_path,
+    normalize_font_path,
+    get_available_font_for_language
+)
+from subtitle_encoding import (
+    detect_file_encoding,
+    is_utf8,
+    convert_subtitle_encoding
+)
 
 app = Flask(__name__)
 CORS(app)
@@ -68,7 +81,7 @@ class SubtitleMerger:
 
         return sorted(video_files)
 
-    def merge_subtitle(self, video_path, subtitle_path, output_path, use_gpu=False, gpu_type='auto', subtitle_style=None):
+    def merge_subtitle(self, video_path, subtitle_path, output_path, use_gpu=False, gpu_type='auto', subtitle_style=None, language_code=None):
         """使用ffmpeg合并视频和字幕
 
         Args:
@@ -81,9 +94,12 @@ class SubtitleMerger:
                 - font_size: 字体大小 (默认: 原样式)
                 - margin_v: 垂直边距 (默认: 原样式)
                 - alignment: 对齐方式 1-9 (默认: 2 底部居中)
-                - font_name: 字体名称 (可选)
+                - font_name: 字体名称或字体文件路径 (可选)
+                - font_file: 字体文件路径 (可选，优先于font_name)
                 - outline: 轮廓粗细 (可选)
                 - shadow: 阴影深度 (可选)
+                - auto_font: 是否启用自动字体映射 (默认: True)
+            language_code: 语种代码，用于自动字体映射 (如 'AR', 'CN')
         """
         global current_process
 
@@ -116,17 +132,122 @@ class SubtitleMerger:
             filter_subtitle_path = subtitle_path.replace('\\', '/').replace(':', '\\:')
 
             # 构建字幕样式参数
-            subtitle_filter = f"subtitles='{filter_subtitle_path}'"
+            # 添加字符编码支持，确保FFmpeg正确解析UTF-8字幕
+            # 初始化滤镜参数列表
+            subtitle_filter_parts = [f"subtitles='{filter_subtitle_path}':charenc=UTF-8"]
+
+            # 用于跟踪是否已添加 fontsdir
+            fontsdir_added = False
+
             if subtitle_style:
                 style_params = []
+
+                # 字体处理 - 支持自动映射、字体文件路径和字体名称
+                font_applied = False
+                auto_font = subtitle_style.get('auto_font', True)
+
+                # 优先级1: 明确指定的字体文件路径
+                if subtitle_style.get('font_file'):
+                    font_file = subtitle_style['font_file']
+                    if os.path.exists(font_file):
+                        normalized_font = normalize_font_path(font_file)
+                        subtitle_filter_parts.append(f"fontsdir='{os.path.dirname(normalized_font)}'")
+                        style_params.append(f"FontName={os.path.basename(font_file)}")
+                        font_applied = True
+                    else:
+                        self.log(f"⚠️ 字体文件不存在: {font_file}")
+
+                # 优先级2: 用户指定的字体名称
+                if not font_applied and subtitle_style.get('font_name'):
+                    font_name = subtitle_style['font_name']
+
+                    # 判断是否为文件路径
+                    if is_font_file_path(font_name):
+                        if os.path.exists(font_name):
+                            normalized_font = normalize_font_path(font_name)
+                            subtitle_filter_parts.append(f"fontsdir='{os.path.dirname(normalized_font)}'")
+                            style_params.append(f"FontName={os.path.basename(font_name)}")
+                            font_applied = True
+                        else:
+                            self.log(f"⚠️ 字体文件不存在: {font_name}")
+                    else:
+                        # 字体名称
+                        style_params.append(f"FontName={font_name}")
+                        font_applied = True
+
+                # 优先级3: 自动语种字体映射（启用且有语种代码）
+                if not font_applied and auto_font and language_code:
+                    # 获取系统中实际可用的字体
+                    font_type, font_value = get_available_font_for_language(language_code)
+
+                    if font_type == 'file':
+                        # 使用字体文件
+                        if os.path.exists(font_value):
+                            # 设置 fontsdir 参数（添加到主滤镜参数中）
+                            font_dir = os.path.dirname(font_value)
+                            normalized_dir = normalize_font_path(font_dir)
+
+                            if not fontsdir_added:
+                                subtitle_filter_parts[0] += f":fontsdir='{normalized_dir}'"
+                                fontsdir_added = True
+
+                            # 根据字体文件名确定 FontName
+                            # 测试验证：使用标准字体家族名称最可靠
+                            font_file_name = os.path.basename(font_value)
+
+                            # 字体文件名到标准字体名的映射
+                            font_name_map = {
+                                'NotoSansArabic': 'Noto Sans Arabic',
+                                'NotoSansCJKsc': 'Noto Sans CJK SC',
+                                'NotoSansCJKtc': 'Noto Sans CJK TC',
+                                'NotoSansCJKjp': 'Noto Sans CJK JP',
+                                'NotoSansCJKkr': 'Noto Sans CJK KR',
+                                'NotoSansThai': 'Noto Sans Thai',
+                                'NotoSansMyanmar': 'Noto Sans Myanmar',
+                                'NotoSansHebrew': 'Noto Sans Hebrew',
+                                'NotoSansDevanagari': 'Noto Sans Devanagari',
+                            }
+
+                            # 查找匹配的字体名称
+                            font_display_name = None
+                            for key, value in font_name_map.items():
+                                if key.lower() in font_file_name.lower():
+                                    font_display_name = value
+                                    break
+
+                            if font_display_name is None:
+                                # 如果没有匹配，使用文件名（去掉扩展名和variant）
+                                font_basename = os.path.splitext(font_file_name)[0]
+                                font_basename = font_basename.split('-')[0]
+                                font_display_name = font_basename
+
+                            style_params.append(f"FontName={font_display_name}")
+
+                            self.log(f"🎨 为 {language_code} 使用字体: {font_display_name}")
+                            self.log(f"   字体文件: {font_file_name}")
+                            font_applied = True
+                        else:
+                            self.log(f"⚠️ 字体文件不存在: {font_value}")
+                    elif font_type == 'name':
+                        # 使用系统字体名称
+                        style_params.append(f"FontName={font_value}")
+                        self.log(f"🎨 为 {language_code} 使用系统字体: {font_value}")
+
+                        # 如果是Arial回退，说明系统没有该语种的专用字体
+                        if font_value == 'Arial':
+                            recommended = get_font_for_language(language_code)[0]
+                            self.log(f"⚠️ 系统未安装 {recommended}，使用 Arial 回退（可能显示为方框）")
+                            self.log(f"💡 建议: 下载 {recommended} 字体并放入 fonts/ 目录")
+
+                        font_applied = True
+
+                # 其他样式参数
                 if subtitle_style.get('font_size'):
                     style_params.append(f"FontSize={subtitle_style['font_size']}")
                 if subtitle_style.get('margin_v'):
                     style_params.append(f"MarginV={subtitle_style['margin_v']}")
                 if subtitle_style.get('alignment'):
                     style_params.append(f"Alignment={subtitle_style['alignment']}")
-                if subtitle_style.get('font_name'):
-                    style_params.append(f"FontName={subtitle_style['font_name']}")
                 if subtitle_style.get('outline'):
                     style_params.append(f"Outline={subtitle_style['outline']}")
                 if subtitle_style.get('shadow'):
@@ -134,7 +255,9 @@ class SubtitleMerger:
 
                 if style_params:
                     force_style = ','.join(style_params)
-                    subtitle_filter = f"subtitles='{filter_subtitle_path}':force_style='{force_style}'"
+                    subtitle_filter_parts.append(f"force_style='{force_style}'")
+
+            subtitle_filter = ':'.join(subtitle_filter_parts)
 
             cmd.extend(['-vf', subtitle_filter])
 
@@ -317,8 +440,24 @@ class SubtitleMerger:
                     processing_status['current_task'] = f"{video_file} -> {lang}"
                     self.log(f"正在处理: {output_file}")
 
-                    # 合成视频和字幕
-                    success, error_msg = self.merge_subtitle(video_path, subtitle_path, output_path, use_gpu, gpu_type, subtitle_style)
+                    # 检查并转换字幕编码为 UTF-8
+                    if not is_utf8(subtitle_path):
+                        self.log(f"⚠️ 检测到非UTF-8编码字幕，正在自动转换...")
+                        encoding_result = detect_file_encoding(subtitle_path)
+                        if encoding_result:
+                            detected_encoding = encoding_result.get('encoding', 'unknown')
+                            confidence = encoding_result.get('confidence', 0)
+                            self.log(f"   检测到编码: {detected_encoding} (置信度: {confidence:.2f})")
+
+                        conv_success, conv_message = convert_subtitle_encoding(subtitle_path, lang)
+                        if conv_success:
+                            self.log(f"✅ {conv_message}")
+                        else:
+                            self.log(f"⚠️ 编码转换失败: {conv_message}")
+                            self.log(f"   将尝试使用原始编码处理...")
+
+                    # 合成视频和字幕 - 传递语种代码用于自动字体映射
+                    success, error_msg = self.merge_subtitle(video_path, subtitle_path, output_path, use_gpu, gpu_type, subtitle_style, language_code=lang)
 
                     if success:
                         self.log(f"✓ 完成: {output_file}")
@@ -568,6 +707,46 @@ def stop_processing():
                 pass
 
     return jsonify({'success': True, 'message': '正在终止任务...'})
+
+
+@app.route('/api/font_files', methods=['GET'])
+def get_font_files():
+    """获取fonts目录中的字体文件列表"""
+    try:
+        font_files = get_all_font_files()
+        return jsonify({
+            'success': True,
+            'fonts': font_files,
+            'count': len(font_files)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@app.route('/api/font_recommendation', methods=['POST'])
+def get_font_recommendation():
+    """根据语种代码获取推荐字体"""
+    data = request.json
+    language_code = data.get('language_code', '')
+
+    if not language_code:
+        return jsonify({'success': False, 'error': '缺少语种代码'})
+
+    try:
+        recommended_fonts = get_font_for_language(language_code)
+        return jsonify({
+            'success': True,
+            'language': language_code,
+            'fonts': recommended_fonts[:5]  # 返回前5个推荐字体
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 
 if __name__ == '__main__':
