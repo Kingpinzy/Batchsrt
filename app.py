@@ -139,9 +139,10 @@ class SubtitleMerger:
             # 用于跟踪是否已添加 fontsdir
             fontsdir_added = False
 
-            if subtitle_style:
-                style_params = []
+            # 初始化样式参数列表（即使没有自定义样式也要设置默认值）
+            style_params = []
 
+            if subtitle_style:
                 # 字体处理 - 支持自动映射、字体文件路径和字体名称
                 font_applied = False
                 auto_font = subtitle_style.get('auto_font', True)
@@ -248,14 +249,23 @@ class SubtitleMerger:
                     style_params.append(f"MarginV={subtitle_style['margin_v']}")
                 if subtitle_style.get('alignment'):
                     style_params.append(f"Alignment={subtitle_style['alignment']}")
-                if subtitle_style.get('outline'):
-                    style_params.append(f"Outline={subtitle_style['outline']}")
-                if subtitle_style.get('shadow'):
-                    style_params.append(f"Shadow={subtitle_style['shadow']}")
 
-                if style_params:
-                    force_style = ','.join(style_params)
-                    subtitle_filter_parts.append(f"force_style='{force_style}'")
+            # 黑边和阴影参数 - 始终显式设置以覆盖ASS文件内部样式
+            # 如果用户设置了值则使用用户的值，否则默认为0（无黑边/无阴影）
+            if subtitle_style and subtitle_style.get('outline') is not None:
+                style_params.append(f"Outline={subtitle_style['outline']}")
+            else:
+                style_params.append("Outline=0")
+
+            if subtitle_style and subtitle_style.get('shadow') is not None:
+                style_params.append(f"Shadow={subtitle_style['shadow']}")
+            else:
+                style_params.append("Shadow=0")
+
+            # 应用样式参数
+            if style_params:
+                force_style = ','.join(style_params)
+                subtitle_filter_parts.append(f"force_style='{force_style}'")
 
             subtitle_filter = ':'.join(subtitle_filter_parts)
 
